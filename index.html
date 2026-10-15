@@ -1,0 +1,374 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Záznam škod vozidel</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: one narrow column like a handheld check sheet; sticky header, big touch targets, sticky save bar */
+:root{
+  --bg:#eef0f2; --panel:#ffffff; --ink:#1b2128; --muted:#5b6672; --line:#d3d8de;
+  --accent:#e8b100; --accent-ink:#1b2128;
+  /* směr události: příjem modrá, výdej oranžová */
+  --in:#1d5fbf; --in-ink:#ffffff; --out:#c85a06; --out-ink:#ffffff;
+  --ok:#1f7a4d; --warn:#9a6400; --err:#b3261e;
+  --ok-bg:#e3f2ea; --warn-bg:#fbf0d9; --err-bg:#fbe5e3;
+  --f-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,"Consolas",monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#14181d; --panel:#1d232a; --ink:#e7eaee; --muted:#9aa5b1; --line:#323b45;
+  --accent:#f2c230; --accent-ink:#14181d;
+  --in:#6aa6f5; --in-ink:#0d1a2c; --out:#f39a52; --out-ink:#2a1405;
+  --ok:#5fc48f; --warn:#e9b451; --err:#f08a80;
+  --ok-bg:#183126; --warn-bg:#352a12; --err-bg:#3a1c1a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#14181d; --panel:#1d232a; --ink:#e7eaee; --muted:#9aa5b1; --line:#323b45;
+  --accent:#f2c230; --accent-ink:#14181d;
+  --in:#6aa6f5; --in-ink:#0d1a2c; --out:#f39a52; --out-ink:#2a1405;
+  --ok:#5fc48f; --warn:#e9b451; --err:#f08a80;
+  --ok-bg:#183126; --warn-bg:#352a12; --err-bg:#3a1c1a; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{--dir:var(--in);--dir-ink:var(--in-ink)}
+body[data-dir="vydej"]{--dir:var(--out);--dir-ink:var(--out-ink)}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.45}
+.wrap{max-width:560px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 120px;display:flex;flex-direction:column;gap:14px}
+
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--dir);color:var(--dir-ink)}
+header .in{max-width:560px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px;display:flex;align-items:baseline;justify-content:space-between;gap:12px}
+header h1{margin:0;font-family:var(--f-display);font-weight:700;font-size:1.5rem;letter-spacing:.02em;text-transform:uppercase}
+header h1 span{opacity:.6}
+header h1 b{font-weight:inherit}
+header time{font-family:var(--f-mono);font-size:.8rem;opacity:.75;font-variant-numeric:tabular-nums}
+
+section.card{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:16px;display:flex;flex-direction:column;gap:10px}
+.lbl{font-family:var(--f-display);font-weight:600;text-transform:uppercase;letter-spacing:.08em;font-size:.95rem;color:var(--muted);display:flex;justify-content:space-between;align-items:baseline}
+.lbl small{font-family:var(--f-body);text-transform:none;letter-spacing:0;font-weight:500}
+
+/* event type toggle */
+.seg{display:grid;grid-template-columns:1fr 1fr;border:2px solid var(--ink);border-radius:6px;overflow:hidden}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg label{padding:14px 8px;text-align:center;font-family:var(--f-display);font-weight:700;font-size:1.25rem;text-transform:uppercase;letter-spacing:.06em;cursor:pointer;user-select:none}
+.seg label:last-of-type{border-left:2px solid var(--ink)}
+#typ-p:checked+label{background:var(--in);color:var(--in-ink)}
+#typ-v:checked+label{background:var(--out);color:var(--out-ink)}
+.seg input:focus-visible+label{outline:3px solid var(--ink);outline-offset:-5px}
+
+/* VIN */
+#vin{width:100%;font-family:var(--f-mono);font-weight:700;font-size:1.3rem;letter-spacing:.12em;text-transform:uppercase;padding:12px;border:2px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
+#vin:focus{outline:none;border-color:var(--accent)}
+.slots{display:grid;grid-template-columns:3fr 6fr 8fr;gap:6px}
+.grp{display:flex;flex-direction:column;gap:3px;min-width:0}
+.grp .cells{display:grid;gap:2px}
+.grp:nth-child(1) .cells{grid-template-columns:repeat(3,1fr)}
+.grp:nth-child(2) .cells{grid-template-columns:repeat(6,1fr)}
+.grp:nth-child(3) .cells{grid-template-columns:repeat(8,1fr)}
+.cell{font-family:var(--f-mono);font-size:.8rem;text-align:center;padding:4px 0;border-bottom:2px solid var(--line);min-height:1.7em;color:var(--ink)}
+.cell.bad{color:var(--err);border-color:var(--err);font-weight:700}
+.cell.soft{color:var(--warn);border-color:var(--warn)}
+.grp span{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.msgs{display:flex;flex-direction:column;gap:6px;margin:0;padding:0;list-style:none}
+.msgs li{font-size:.9rem;padding:6px 10px;border-radius:4px}
+.msgs .e{background:var(--err-bg);color:var(--err)}
+.msgs .w{background:var(--warn-bg);color:var(--warn)}
+.msgs .o{background:var(--ok-bg);color:var(--ok)}
+
+.cell.miss{border-color:var(--err)}
+.confirm{display:flex;gap:10px;align-items:flex-start;padding:10px;border:2px dashed var(--warn);border-radius:6px;cursor:pointer;font-size:.95rem}
+.confirm input{width:22px;height:22px;flex:none;margin:0;accent-color:var(--warn)}
+.need{font-weight:600;color:var(--err)}
+.need.done{color:var(--ok)}
+textarea{width:100%;min-height:120px;resize:vertical;font:inherit;padding:12px;border:2px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
+textarea:focus{outline:none;border-color:var(--accent)}
+
+/* photos */
+.btns{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;padding:13px 10px;border:2px solid var(--ink);border-radius:6px;background:transparent;color:var(--ink);font-family:var(--f-display);font-weight:600;font-size:1.1rem;text-transform:uppercase;letter-spacing:.05em;cursor:pointer}
+.btn:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.btn svg{width:20px;height:20px;flex:none}
+.btns input{display:none}
+.thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px}
+.thumb{position:relative;aspect-ratio:1;max-width:100%;border-radius:4px;overflow:hidden;background:var(--bg);border:1px solid var(--line)}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.thumb button{position:absolute;top:4px;right:4px;width:30px;height:30px;border-radius:50%;border:none;background:var(--ink);color:var(--bg);font-size:1rem;line-height:1;cursor:pointer}
+.thumb i{position:absolute;left:4px;bottom:4px;font-style:normal;font-family:var(--f-mono);font-size:.7rem;background:var(--ink);color:var(--bg);padding:1px 5px;border-radius:3px}
+.empty{color:var(--muted);font-size:.9rem;margin:0}
+
+/* save bar */
+.bar{position:fixed;left:0;right:0;bottom:0;z-index:5;background:var(--panel);border-top:4px solid var(--dir);padding-bottom:env(safe-area-inset-bottom,0px)}
+.bar .in{max-width:560px;margin:0 auto;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:10px;display:flex;gap:10px;align-items:center}
+.bar p{margin:0;flex:1;min-width:0;font-size:.85rem;color:var(--muted)}
+.save{padding:14px 22px;border:none;border-radius:6px;background:var(--dir);color:var(--dir-ink);font-family:var(--f-display);font-weight:700;font-size:1.2rem;text-transform:uppercase;letter-spacing:.06em;cursor:pointer}
+.save:disabled{opacity:.45;cursor:not-allowed}
+.save:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+
+/* log */
+.log{display:flex;flex-direction:column;gap:0;margin:0;padding:0;list-style:none}
+.log li{display:grid;grid-template-columns:auto 1fr auto;gap:4px 10px;padding:10px 0;border-top:1px solid var(--line);align-items:baseline}
+.log li:first-child{border-top:none}
+.tag{font-family:var(--f-display);font-weight:700;text-transform:uppercase;font-size:.8rem;letter-spacing:.06em;padding:2px 8px;border-radius:3px;border:1.5px solid var(--ink)}
+.tag.p{background:var(--in);color:var(--in-ink);border-color:var(--in)}
+.tag.v{background:var(--out);color:var(--out-ink);border-color:var(--out)}
+.log b{font-family:var(--f-mono);font-size:.9rem;overflow-wrap:anywhere;min-width:0}
+.log time{font-family:var(--f-mono);font-size:.75rem;color:var(--muted)}
+.log p{grid-column:1/-1;margin:0;font-size:.9rem;color:var(--muted);overflow-wrap:anywhere}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:6px;font-weight:600;z-index:9}
+@media (prefers-reduced-motion:no-preference){.toast{transition:opacity .2s}}
+</style>
+
+<header><div class="in"><h1>Škody <span>/</span> <b id="dirLbl">Příjem</b></h1><time id="clock"></time></div></header>
+
+<form id="f" class="wrap" novalidate>
+  <div style="height:2px"></div>
+
+  <section class="card" aria-labelledby="l-typ">
+    <div class="lbl" id="l-typ">Typ události</div>
+    <div class="seg" role="radiogroup" aria-labelledby="l-typ">
+      <input type="radio" name="typ" id="typ-p" value="prijem" checked><label for="typ-p">Příjem</label>
+      <input type="radio" name="typ" id="typ-v" value="vydej"><label for="typ-v">Výdej</label>
+    </div>
+  </section>
+
+  <section class="card">
+    <label class="lbl" for="vin">VIN <small id="vinCount">0 / 17</small></label>
+    <input id="vin" name="vin" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="24" placeholder="TMB…">
+    <div class="slots" aria-hidden="true">
+      <div class="grp"><div class="cells" id="g1"></div><span>WMI výrobce</span></div>
+      <div class="grp"><div class="cells" id="g2"></div><span>VDS</span></div>
+      <div class="grp"><div class="cells" id="g3"></div><span>VIS sériové</span></div>
+    </div>
+    <ul class="msgs" id="vinMsgs" aria-live="polite"></ul>
+    <label class="confirm" id="vinConfirmBox" hidden>
+      <input type="checkbox" id="vinConfirm">
+      <span>VIN jsem zkontroloval podle vozu a chci ho uložit tak, jak je.</span>
+    </label>
+  </section>
+
+  <section class="card">
+    <label class="lbl" for="popis">Popis škody <small id="popisCount">0 znaků</small></label>
+    <textarea id="popis" name="popis" placeholder="Např. škrábanec na zadních levých dveřích, cca 10 cm"></textarea>
+  </section>
+
+  <section class="card">
+    <div class="lbl">Fotografie <small id="fotoCount">0</small></div>
+    <div class="btns">
+      <label class="btn" for="cam">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Vyfotit
+      </label>
+      <input type="file" id="cam" accept="image/*" capture="environment">
+      <label class="btn" for="gal">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 16l5-5 4 4 3-3 6 6"/><circle cx="16" cy="9" r="1.6"/></svg>Z galerie
+      </label>
+      <input type="file" id="gal" accept="image/*" multiple>
+    </div>
+    <div class="thumbs" id="thumbs"></div>
+    <p class="empty" id="noFoto">Zatím žádné fotky.</p>
+  </section>
+
+  <section class="card">
+    <div class="lbl">Uložené události <small>odeslané v této relaci</small></div>
+    <ul class="log" id="log"></ul>
+    <p class="empty" id="noLog">Po odeslání se událost objeví tady i s číslem řádku v tabulce.</p>
+  </section>
+</form>
+
+<div class="bar"><div class="in">
+  <p id="hint">Zadejte platné VIN a popis škody.</p>
+  <button type="submit" form="f" class="save" id="save" disabled>Uložit</button>
+</div></div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+// ---- Pravidla VIN (převzato z projektu Sklad) ----
+const VIN_RULES = {
+  delka: 17,
+  predpony: { TMB:"Škoda", WVW:"Volkswagen", WAU:"Audi" }, // doplnit druhou předponu Audi po ověření
+  zakazane: /[IOQ]/,
+  povolene: /^[A-HJ-NPR-Z0-9]*$/
+};
+
+// Délka 17 je tvrdá podmínka (e). Vše ostatní je upozornění (w): uživatel ho může potvrdit a VIN odeslat.
+function checkVin(raw){
+  const v = raw.toUpperCase().replace(/[\s\-]/g,"").slice(0,VIN_RULES.delka);
+  const e=[], w=[], bad=new Set(), soft=new Set();
+  [...v].forEach((c,i)=>{ if(!/[A-Z0-9]/.test(c) || VIN_RULES.zakazane.test(c)) soft.add(i); });
+  if([...v].some(c=>VIN_RULES.zakazane.test(c))) w.push("Písmena I, O a Q se ve VIN nepoužívají. Nejspíš jde o 1 nebo 0.");
+  if([...v].some(c=>!/[A-Z0-9]/.test(c))) w.push("VIN obsahuje jiný znak než písmeno nebo číslici.");
+  if(v.length && v.length<VIN_RULES.delka) e.push(`Chybí ${VIN_RULES.delka-v.length} ${VIN_RULES.delka-v.length===1?"znak":VIN_RULES.delka-v.length<=4?"znaky":"znaků"}. VIN musí mít přesně 17 znaků.`);
+  let znacka=null;
+  if(v.length>=3){
+    const p=v.slice(0,3); znacka=VIN_RULES.predpony[p]||null;
+    if(!znacka){ w.push(`Předpona ${p} není mezi známými (TMB, WVW, WAU).`); [0,1,2].forEach(i=>soft.add(i)); }
+  }
+  if(v.length===17){
+    const tail=v.slice(11);
+    if(!/^\d{6}$/.test(tail)){ w.push("Posledních 6 znaků bývá jen z číslic."); for(let i=11;i<17;i++) if(!/\d/.test(v[i])) soft.add(i); }
+  }
+  const delkaOk = v.length===VIN_RULES.delka;
+  return { v, delkaOk, ok: delkaOk && w.length===0, e, w, bad, soft, znacka };
+}
+const MIN_FOTEK = 3;
+
+// ---- UI ----
+const $=id=>document.getElementById(id);
+const vinEl=$("vin"), popisEl=$("popis");
+let fotky=[]; // {file,url}
+let lastVin={ok:false};
+
+function renderSlots(r){
+  const groups=[[$("g1"),0,3],[$("g2"),3,9],[$("g3"),9,17]];
+  groups.forEach(([el,a,b])=>{
+    el.innerHTML="";
+    for(let i=a;i<b;i++){
+      const d=document.createElement("div");
+      d.className="cell"+(r.bad.has(i)?" bad":r.soft.has(i)?" soft":(!r.v[i]&&r.v.length)?" miss":"");
+      d.textContent=r.v[i]||"";
+      el.appendChild(d);
+    }
+  });
+}
+function renderMsgs(r){
+  const ul=$("vinMsgs"); ul.innerHTML="";
+  const add=(t,c)=>{const li=document.createElement("li");li.className=c;li.textContent=t;ul.appendChild(li);};
+  r.e.forEach(t=>add(t,"e")); r.w.forEach(t=>add(t,"w"));
+  if(r.ok) add(`VIN v pořádku · ${r.znacka}`,"o");
+  else if(r.delkaOk) add("Zkontrolujte VIN podle vozu. Pokud opravdu takto je, potvrďte to níže.","w");
+  $("vinConfirmBox").hidden = !(r.delkaOk && r.w.length);
+}
+function onVin(){
+  const pos=vinEl.selectionStart;
+  const r=checkVin(vinEl.value);
+  if(r.v!==lastVin.v) $("vinConfirm").checked=false;
+  vinEl.value=r.v; try{vinEl.setSelectionRange(pos,pos);}catch(_){}
+  $("vinCount").textContent=`${r.v.length} / 17`;
+  renderSlots(r); renderMsgs(r); lastVin=r; updateSave();
+}
+vinEl.addEventListener("input",onVin);
+
+popisEl.addEventListener("input",()=>{ $("popisCount").textContent=`${popisEl.value.trim().length} znaků`; updateSave(); });
+
+function addFiles(list){
+  [...list].forEach(f=>{ if(f.type.startsWith("image/")) fotky.push({file:f,url:URL.createObjectURL(f)}); });
+  renderThumbs(); updateSave();
+}
+$("cam").addEventListener("change",e=>{addFiles(e.target.files); e.target.value="";});
+$("gal").addEventListener("change",e=>{addFiles(e.target.files); e.target.value="";});
+
+function renderThumbs(){
+  const t=$("thumbs"); t.innerHTML="";
+  fotky.forEach((f,i)=>{
+    const d=document.createElement("div"); d.className="thumb";
+    d.innerHTML=`<img alt="Fotka ${i+1}"><i>${i+1}</i><button type="button" aria-label="Odebrat fotku ${i+1}">×</button>`;
+    d.querySelector("img").src=f.url;
+    d.querySelector("button").onclick=()=>{URL.revokeObjectURL(f.url); fotky.splice(i,1); renderThumbs(); updateSave();};
+    t.appendChild(d);
+  });
+  const fc=$("fotoCount");
+  fc.textContent=`${fotky.length} / min. ${MIN_FOTEK} fotografie`;
+  fc.className="need"+(fotky.length>=MIN_FOTEK?" done":"");
+  $("noFoto").hidden=fotky.length>0;
+}
+
+const fotekSlovo=n=>n===1?"fotka":n>=2&&n<=4?"fotky":"fotek";
+function updateSave(){
+  const popisOk=popisEl.value.trim().length>0;
+  const vinOk=lastVin.delkaOk && (lastVin.ok || $("vinConfirm").checked);
+  const fotoOk=fotky.length>=MIN_FOTEK;
+  $("save").disabled=!(vinOk && popisOk && fotoOk);
+  $("hint").textContent =
+    !lastVin.delkaOk ? "VIN musí mít přesně 17 znaků." :
+    !vinOk ? "Zkontrolujte VIN a potvrďte ho." :
+    !popisOk ? "Doplňte popis škody." :
+    !fotoOk ? `Přidejte ještě ${MIN_FOTEK-fotky.length} ${fotekSlovo(MIN_FOTEK-fotky.length)}.` :
+    `Připraveno: ${typVal()==="prijem"?"příjem":"výdej"}, ${fotky.length} ${fotekSlovo(fotky.length)}.`;
+}
+$("vinConfirm").addEventListener("change",updateSave);
+const typVal=()=>document.querySelector('input[name="typ"]:checked').value;
+function setDir(){ const t=typVal(); document.body.dataset.dir=t; $("dirLbl").textContent=t==="prijem"?"Příjem":"Výdej"; }
+document.querySelectorAll('input[name="typ"]').forEach(r=>r.addEventListener("change",()=>{setDir();updateSave();}));
+setDir();
+
+// ---- Odeslání do Google Sheetu (Apps Script webová aplikace, URL končí /exec) ----
+const SCRIPT_URL = "";
+const FOTO_MAX_PX = 1600, FOTO_KVALITA = 0.82;
+
+// Zmenší fotku na delší stranu FOTO_MAX_PX a vrátí JPEG v base64 (bez prefixu data:)
+function zmensiFotku(file){
+  return new Promise((res,rej)=>{
+    const img=new Image(), url=URL.createObjectURL(file);
+    img.onload=()=>{
+      const k=Math.min(1, FOTO_MAX_PX/Math.max(img.width,img.height));
+      const c=document.createElement("canvas");
+      c.width=Math.round(img.width*k); c.height=Math.round(img.height*k);
+      c.getContext("2d").drawImage(img,0,0,c.width,c.height);
+      URL.revokeObjectURL(url);
+      res(c.toDataURL("image/jpeg",FOTO_KVALITA).split(",")[1]);
+    };
+    img.onerror=()=>{URL.revokeObjectURL(url); rej(new Error("Fotku se nepodařilo načíst."));};
+    img.src=url;
+  });
+}
+
+async function odesli(u, soubory){
+  if(!SCRIPT_URL) throw new Error("Adresa serveru není nastavená.");
+  const data=[];
+  for(const f of soubory) data.push({mime:"image/jpeg", data:await zmensiFotku(f)});
+  let r;
+  try{
+    // text/plain = bez CORS preflight, Apps Script ho přijme
+    r=await fetch(SCRIPT_URL,{method:"POST",headers:{"Content-Type":"text/plain;charset=utf-8"},
+      body:JSON.stringify({cas:u.cas.toISOString(), typ:u.typ, vin:u.vin, popis:u.popis, vinPotvrzeno:u.varovani, fotky:data})});
+  }catch(_){ throw new Error("Nepodařilo se spojit se serverem. Zkontrolujte připojení."); }
+  const j=await r.json().catch(()=>({ok:false,chyba:"Server vrátil nečitelnou odpověď."}));
+  if(!j.ok) throw new Error(j.chyba||"Server událost nepřijal.");
+  return j;
+}
+
+const udalosti=[];
+let odesilam=false;
+$("f").addEventListener("submit",async e=>{
+  e.preventDefault();
+  if($("save").disabled||odesilam) return;
+  const u={ cas:new Date(), typ:typVal(), vin:lastVin.v, znacka:lastVin.znacka, popis:popisEl.value.trim(), fotky:fotky.length, varovani:!lastVin.ok, stav:"odesílám" };
+  odesilam=true; $("save").disabled=true; $("save").textContent="Odesílám…";
+  try{
+    const j=await odesli(u, fotky.map(f=>f.file));
+    u.stav=`v listu ${j.list}, řádek ${j.radek}`;
+    udalosti.unshift(u); renderLog();
+    fotky.forEach(f=>URL.revokeObjectURL(f.url)); fotky=[];
+    vinEl.value=""; popisEl.value=""; onVin(); renderThumbs(); popisEl.dispatchEvent(new Event("input"));
+    toast(`Odesláno · ${u.vin}`);
+    vinEl.focus();
+  }catch(err){
+    // formulář necháme vyplněný, ať jde odeslat znovu
+    toast(`Neodesláno: ${err.message}`, 5000);
+  }finally{
+    odesilam=false; $("save").textContent="Uložit"; updateSave();
+  }
+});
+function renderLog(){
+  const ul=$("log"); ul.innerHTML="";
+  udalosti.forEach(u=>{
+    const li=document.createElement("li");
+    li.innerHTML=`<span class="tag ${u.typ==="prijem"?"p":"v"}"></span><b></b><time></time><p></p>`;
+    li.children[0].textContent=u.typ==="prijem"?"Příjem":"Výdej";
+    li.children[1].textContent=u.vin;
+    li.children[2].textContent=u.cas.toLocaleTimeString("cs-CZ",{hour:"2-digit",minute:"2-digit"});
+    li.children[3].textContent=`${u.popis} · fotek: ${u.fotky}${u.varovani?" · VIN potvrzeno ručně":""} · ${u.stav}`;
+    ul.appendChild(li);
+  });
+  $("noLog").hidden=udalosti.length>0;
+}
+let tt; function toast(t,ms=2200){const el=$("toast"); el.textContent=t; el.hidden=false; clearTimeout(tt); tt=setTimeout(()=>el.hidden=true,ms);}
+
+function tick(){ $("clock").textContent=new Date().toLocaleString("cs-CZ",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}); }
+tick(); setInterval(tick,30000);
+
+// ukázkové vyplnění, ať je vidět kontrola
+renderThumbs();
+vinEl.value="TMBJR7NX5RY0O4218"; onVin();
+popisEl.value="Škrábanec na zadním levém blatníku, cca 8 cm"; popisEl.dispatchEvent(new Event("input"));
+</script>
+
+</body></html>
